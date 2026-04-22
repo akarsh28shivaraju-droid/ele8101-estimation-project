@@ -1,0 +1,80 @@
+function est = ekf_1(data, C)
+    % State: x = [position; velocity]
+
+    N = C.N_steps;
+    n = 2;                         % state dimension
+    m = length(C.beacons);         % number of measurements
+
+    % Initial estimate
+    x_hat = [0; 8];                % initial guess [position; velocity]
+    P = diag([25, 4]);             % initial covariance
+
+    % Process noise covariance
+    Q = [0, 0;
+         0, C.qv^2];
+
+    % Measurement noise covariance
+    R = (C.sigma_range^2) * eye(m);
+
+    % Linear state transition matrix
+    F = [1, C.Ts;
+         0, 1];
+
+    % Store estimates
+    X_hat = zeros(n, N+1);
+    P_store = zeros(n, n, N+1);
+
+    X_hat(:,1) = x_hat;
+    P_store(:,:,1) = P;
+
+    for k = 1:N
+        % -------------------------
+        % Prediction step
+        % -------------------------
+        x_pred = [x_hat(1) + C.Ts*x_hat(2);
+                  x_hat(2)];
+
+        P_pred = F * P * F' + Q;
+
+        % -------------------------
+        % Measurement prediction
+        % -------------------------
+        y_pred = zeros(m,1);
+        H = zeros(m,n);
+
+        for i = 1:m
+            beacon = C.beacons(i);
+            diff_val = x_pred(1) - beacon;
+
+            y_pred(i) = abs(diff_val);
+
+            % Jacobian of |p - beacon|
+            if diff_val > 0
+                H(i,:) = [1, 0];
+            elseif diff_val < 0
+                H(i,:) = [-1, 0];
+            else
+                H(i,:) = [0, 0];   % avoid undefined derivative exactly at zero
+            end
+        end
+
+        % -------------------------
+        % Update step
+        % -------------------------
+        y_meas = data.Y(:,k);
+        innov = y_meas - y_pred;
+
+        S = H * P_pred * H' + R;
+        K = P_pred * H' / S;
+
+        x_hat = x_pred + K * innov;
+        P = (eye(n) - K * H) * P_pred;
+
+        % Store
+        X_hat(:,k+1) = x_hat;
+        P_store(:,:,k+1) = P;
+    end
+
+    est.X_hat = X_hat;
+    est.P = P_store;
+end
