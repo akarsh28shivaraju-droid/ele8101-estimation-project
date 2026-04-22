@@ -1,5 +1,3 @@
-Save under src - measurement_2.m
-
 function y = measurement_2(x, C)
     % x = [arc_length; speed]
     pos = path_2(x(1), C);
