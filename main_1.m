@@ -26,3 +26,5 @@ ylabel('Measured Range [m]');
 title('Step 1: Noisy Beacon Measurements');
 legend('Beacon 1', 'Beacon 2');
 grid on;
+
+run_ekf_1();
