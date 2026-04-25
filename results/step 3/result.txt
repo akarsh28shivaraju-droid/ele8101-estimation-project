@@ -1,0 +1,4 @@
+Step 3 Longitudinal Position RMSE = 0.1719 m
+Step 3 Longitudinal Speed RMSE    = 0.5809 m/s
+Step 3 Lateral Position RMSE      = 0.6816 m
+Step 3 Lateral Speed RMSE         = 2.0155 m/s
