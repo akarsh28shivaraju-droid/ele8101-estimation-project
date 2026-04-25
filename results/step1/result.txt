@@ -1,0 +1,2 @@
+Position RMSE = 0.2604 m
+Velocity RMSE = 0.9016 m/s
