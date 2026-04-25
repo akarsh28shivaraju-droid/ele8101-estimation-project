@@ -1,0 +1,5 @@
+2D position RMSE        = 0.2364 m
+Along-track RMSE        = 0.2028 m
+Lateral offset RMSE     = 0.1216 m
+Longitudinal speed RMSE = 0.3223 m/s
+Lateral speed RMSE      = 0.1992 m/s
