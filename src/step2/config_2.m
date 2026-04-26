@@ -4,7 +4,7 @@ function C = config_2()
     C.s0 = 0.0;
     C.v0 = 10.0;
     C.qv = 0.08;
-    C.N_steps = 3500;
+    C.N_steps = 3100;
 
     % Step 2: simple circular path
     C.Rc = 48.0;
