@@ -16,7 +16,6 @@ This repository contains the group coursework for the ELE8101 Controls module. T
 - 'src/': source code
 - 'results/': plots, outputs, and simulation results
 - 'report/': report files
-- 'meetings/': meeting notes and collaboration records
 
 ## collaboration
 This project uses GitHub for version control, collaboration, and task tracking.
