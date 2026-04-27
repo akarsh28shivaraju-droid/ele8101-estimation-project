@@ -1,5 +1,5 @@
 clear; clc; close all;
-addpath('src');
+addpath('src/step1');
 
 C = config_1();
 data = simulate_1(C);
