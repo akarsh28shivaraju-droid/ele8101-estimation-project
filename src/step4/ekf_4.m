@@ -4,8 +4,8 @@ function est = ekf_4(data, C)
     m = size(C.beacons, 1);
 
     x_hat = [0; 0; 9; 0];
-    P = diag([25, 1, 4, 0.25]);
 
+    P = diag([25, 1, 4, 0.25]);
     Q = diag([1e-3, 1e-3, C.qvs^2, C.qve^2]);
     R = (C.sigma_range^2) * eye(m);
 
