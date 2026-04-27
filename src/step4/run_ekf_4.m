@@ -4,6 +4,7 @@ function run_ekf_4(C)
     t = data.t;
 
     P_est = zeros(2, length(t));
+
     for k = 1:length(t)
         P_est(:, k) = vehicle_position_4(est.X_hat(:, k), C);
     end
@@ -69,14 +70,17 @@ function run_ekf_4(C)
     plot(data.P_true(1, :), data.P_true(2, :), 'b-', 'LineWidth', 2, 'DisplayName', 'True Path');
     plot(P_est(1, :), P_est(2, :), 'r--', 'LineWidth', 1.8, 'DisplayName', 'Estimated Path');
     plot(C.beacons(:, 1), C.beacons(:, 2), 'ro', 'MarkerSize', 8, 'LineWidth', 1.8, 'MarkerFaceColor','r', 'DisplayName', 'Beacons');
+
     xlabel('x [m]');
     ylabel('y [m]');
     title('True vs. Estimated Vehicle Path with Boundaries');
     legend('Location', 'best');
+
     axis equal;
     xlim([min_x, max_x]);
     ylim([min_y, max_y]);
     grid on;
+
     exportgraphics(fig1, '1_2D_Validation_Map.png', 'Resolution', 300);
 
     fig2 = figure('Name', 'Estimated Path Only');
@@ -84,35 +88,44 @@ function run_ekf_4(C)
     plot(P_lower(1,:), P_lower(2,:), 'k-', 'LineWidth', 1.2, 'DisplayName','Track Bounds');
     plot(P_est(1, :), P_est(2, :), 'r--', 'LineWidth', 1.8, 'DisplayName', 'Estimated Path');
     plot(C.beacons(:, 1), C.beacons(:, 2), 'ro', 'MarkerSize', 8, 'LineWidth', 1.8, 'MarkerFaceColor','r', 'DisplayName', 'Beacons');
+
     xlabel('x [m]');
     ylabel('y [m]');
     title('Estimated Vehicle Path (True Path Removed)');
     legend('Location', 'best');
+
     axis equal;
     xlim([min_x, max_x]);
     ylim([min_y, max_y]);
     grid on;
+
     exportgraphics(fig2, '2_Estimated_Path_Only.png', 'Resolution', 300);
 
     fig3 = figure('Name', 'Lateral Position Tracking');
     plot(t, e_true, 'b', 'LineWidth', 1.8, 'DisplayName', 'True Lateral Pos (y_t)'); hold on;
     plot(t, e_est, 'r--', 'LineWidth', 1.6, 'DisplayName', 'Estimated Lateral Pos');
+
     yline(C.e_max, 'k--', 'Upper bound', 'LabelHorizontalAlignment', 'left', 'HandleVisibility','off');
     yline(C.e_min, 'k--', 'Lower bound', 'LabelHorizontalAlignment', 'left', 'HandleVisibility','off');
+
     xlabel('Time [s]');
     ylabel('Lateral offset e [m]');
     title('Estimator Validation: Lateral Position Bounds');
     legend('Location', 'best');
     ylim([-2.5 2.5]);
     grid on;
+
     exportgraphics(fig3, '3_Lateral_Position.png', 'Resolution', 300);
 
     fig4 = figure('Name', 'Velocity Tracking');
+
     subplot(2,1,1);
     plot(t, vs_true, 'b', 'LineWidth', 1.8); hold on;
     plot(t, vs_est, 'r--', 'LineWidth', 1.6);
     yline(C.vs_max, 'k--', 'Maximum Speed');
-    xlabel('Time [s]'); ylabel('Speed v_s [m/s]');
+
+    xlabel('Time [s]');
+    ylabel('Speed v_s [m/s]');
     title('Longitudinal Velocity Validation');
     legend('True v_s', 'Estimated v_s', 'Location', 'best');
     grid on;
@@ -122,10 +135,13 @@ function run_ekf_4(C)
     plot(t, ve_est, 'r--', 'LineWidth', 1.5);
     yline(C.ve_max, 'k--', 'Upper Bound');
     yline(-C.ve_max, 'k--', 'Lower Bound');
-    xlabel('Time [s]'); ylabel('Speed v_e [m/s]');
+
+    xlabel('Time [s]');
+    ylabel('Speed v_e [m/s]');
     title('Lateral Velocity Validation');
     legend('True v_e', 'Estimated v_e', 'Location', 'best');
     grid on;
+
     exportgraphics(fig4, '4_Velocity_Validation.png', 'Resolution', 300);
 
     fig5 = figure('Name', 'Estimator Error and Variance Analysis');
@@ -134,7 +150,8 @@ function run_ekf_4(C)
     plot(t, s_error, 'b', 'LineWidth', 1); hold on;
     plot(t, 3*sigma_s, 'r--', 'LineWidth', 1);
     plot(t, -3*sigma_s, 'r--', 'LineWidth', 1);
-    xlabel('Time [s]'); ylabel('Error [m]');
+    xlabel('Time [s]');
+    ylabel('Error [m]');
     title('Along-track Error (s) with \pm3\sigma Bounds');
     grid on;
 
@@ -142,7 +159,8 @@ function run_ekf_4(C)
     plot(t, e_error, 'b', 'LineWidth', 1); hold on;
     plot(t, 3*sigma_e, 'r--', 'LineWidth', 1);
     plot(t, -3*sigma_e, 'r--', 'LineWidth', 1);
-    xlabel('Time [s]'); ylabel('Error [m]');
+    xlabel('Time [s]');
+    ylabel('Error [m]');
     title('Lateral Error (e) with \pm3\sigma Bounds');
     grid on;
 
@@ -150,7 +168,8 @@ function run_ekf_4(C)
     plot(t, vs_error, 'b', 'LineWidth', 1); hold on;
     plot(t, 3*sigma_vs, 'r--', 'LineWidth', 1);
     plot(t, -3*sigma_vs, 'r--', 'LineWidth', 1);
-    xlabel('Time [s]'); ylabel('Error [m/s]');
+    xlabel('Time [s]');
+    ylabel('Error [m/s]');
     title('Longitudinal Speed Error (v_s) with \pm3\sigma');
     grid on;
 
@@ -158,7 +177,8 @@ function run_ekf_4(C)
     plot(t, ve_error, 'b', 'LineWidth', 1); hold on;
     plot(t, 3*sigma_ve, 'r--', 'LineWidth', 1);
     plot(t, -3*sigma_ve, 'r--', 'LineWidth', 1);
-    xlabel('Time [s]'); ylabel('Error [m/s]');
+    xlabel('Time [s]');
+    ylabel('Error [m/s]');
     title('Lateral Speed Error (v_e) with \pm3\sigma');
     grid on;
 
