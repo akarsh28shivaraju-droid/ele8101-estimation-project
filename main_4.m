@@ -1,5 +1,5 @@
 clear; clc; close all;
-addpath('src/step4');
+addpath('src');
 
 C = config_4();
 plot_track_geometry(C);
