@@ -1,0 +1,504 @@
+ELE8101 – Estimation Theory 
+Team δ Coursework Report 
+Vehicle Position and Velocity Estimation Using Beacon-Based Distance Measurements and Extended Kalman Filter (EKF) 
+ 
+Group Members 
+•	Akarsh Shivaraju (40489329) 
+•	Manoj Ravi(40498308) 
+•	Anusha (40500252) 
+ 
+GitHub Repository 
+https://github.com/akarsh28shivaraju-droid/ele8101-estimation-project 
+ 
+Abstract 
+This project focuses on designing and validating a vehicle state estimation system using beacon-based distance measurements and an Extended Kalman Filter (EKF). The main aim is to estimate the vehicle’s position and velocity while ensuring that important physical constraints such as lane boundaries, speed limits, and one-way motion are always satisfied. 
+The vehicle moves clockwise on a closed track made up of straight and curved sections with a constant lane width of 4 m. To build a reliable final estimator, the work was developed step by step through four stages: a one-dimensional linear motion model, a circular path model, a two-dimensional straight road model with lateral motion, and finally the complete track model. 
+The final estimator uses Frenet-style coordinates based on along-track distance and lateral offset from the centreline. This makes it easier to apply boundary constraints and improves the robustness of the EKF. Simulation results show that the estimator accurately tracks the vehicle states, remains within all physical limits, and produces low estimation errors. RMSE results and ±3σ covariance analysis confirm that the proposed estimator is reliable and suitable for real-time implementation. 
+ 
+1. Introduction 
+State estimation is an important topic in control systems, autonomous vehicles, and robotics. In real applications, it is often impossible to measure the full state of a vehicle directly because sensors are affected by noise, limited accuracy, and cost constraints. Instead, the true vehicle states must be estimated using indirect noisy measurements. 
+In this coursework, the goal is to estimate the position and velocity of a vehicle moving clockwise on a closed track using only range measurements from fixed beacons placed around the track. The vehicle must follow several physical constraints. It cannot move backward, its speed must remain below 25 m/s, and it must stay inside the lane boundaries while naturally tending to remain close to the centre of the road. 
+Since the measurements are based on Euclidean distances between the vehicle and the beacons, the system becomes nonlinear. Because of this, a standard linear Kalman Filter is not suitable. Instead, the Extended Kalman Filter (EKF) is used because it can handle nonlinear measurement models while still being computationally efficient enough for real-time use. 
+To make the final estimator more reliable, the problem was solved progressively in four stages. The work started with a simple one-dimensional linear model, then moved to a circular path model, followed by a two-dimensional straight road model with lateral motion, and finally the full-track model. This step-by-step development helped improve understanding of the system and made the final estimator stronger and easier to justify. 
+Figure 1: Coursework track geometry showing straight sections, curved sections, and beacon placement. 
+  
+ 
+2. Problem Formulation 
+The vehicle moves on a closed track that contains two straight sections and two curved sections. The track dimensions are fixed and provided in the coursework specification. 
+The main track parameters are: 
+•	Outer radius: 50 m  
+•	Inner radius: 46 m  
+•	Right arc radius: 20 m  
+•	Distance between arc centres: 100 m  
+•	Lane width: 4 m  
+The vehicle always moves in the clockwise direction. Its average speed is around 10 m/s, and the maximum allowed speed is 25 m/s. Reverse motion is not allowed. The vehicle is also allowed to move slightly from side to side inside the lane, but it must always remain inside the road boundaries and should naturally stay close to the lane centre. 
+To estimate the vehicle state, fixed beacons are placed outside the track. The onboard sensor measures the Euclidean distance from the vehicle to each beacon. 
+The number and placement of beacons directly affect the observability of the system. In this work, three beacons are used to ensure full two-dimensional position observability. With fewer than three beacons, the vehicle position becomes ambiguous due to geometric symmetry, particularly along certain regions of the track. The selected configuration avoids collinearity and provides sufficient geometric spread, ensuring that the distance measurements uniquely determine the vehicle position. This improves estimation accuracy and prevents degeneracy in the EKF update step. 
+The measurement noise is assumed to be Gaussian with standard deviation: 
+𝜎𝑟𝑎𝑛𝑔𝑒 = 1.5 m 
+ 
+The system operates at: 
+100 Hz 
+ 
+which gives the sampling time: 
+𝑇𝑠 = 0.01 s 
+ 
+The main design decisions in this coursework are: 
+•	number and placement of beacons  
+•	vehicle motion model  
+•	estimator design  
+•	sensor bias handling  
+•	practical real-time feasibility  
+The final goal is to determine whether the estimator can work reliably in a realistic system. 
+                                        Table 1: Given Parameters 
+Parameter 		Value 
+Outer radius 	50 m 	
+Inner radius 	46 m 	
+Right arc radius 	20 m 	
+Distance between centres 	100 m 	
+Lane width 	4 m 	
+Average speed 	10 m/s 	
+Maximum speed 	25 m/s 	
+Maximum lateral speed 	0.55 m/s 	
+Measurement noise 	1.5 m 	
+Sampling frequency 	100 Hz 	
+Sampling time 	0.01 s 	
+
+3. Progressive Modelling Development 
+The final estimator was not built directly from the full track model. Instead, the problem was solved step by step, starting from a simple system and gradually increasing the complexity. 
+This approach made the modelling easier to understand and allowed the EKF to be tested at each stage before moving to the final system. 
+3.1 Step 1 – Linear Path Model 
+The first stage considers the simplest case where the vehicle moves only in one dimension along a straight line, similar to a train moving on a rail. 
+The state vector is: 
+  
+ 
+where: 
+•	𝑝𝑘is the position  
+•	𝑣𝑘is the velocity  The motion model is: 
+𝑝𝑘+1 = 𝑝𝑘 +𝑇𝑠𝑣𝑘 
+𝑣𝑘+1 = 𝑣𝑘 +𝑤𝑘 
+ 
+where 𝑤𝑘represents Gaussian process noise. 
+Two beacons are placed at: 
+•	−20 m  
+•	20 m  
+The measurement model is: 
+𝑧𝑖 =∣ 𝑝 −𝑏𝑖 ∣ +𝑣𝑖 
+ 
+where 𝑣𝑖is measurement noise. 
+The EKF is intentionally started with the wrong initial velocity estimate so that convergence behaviour can be tested. 
+This step verifies that the EKF can successfully estimate position and velocity using noisy distance measurements. 
+Figure2: Step 1 true vs estimated position 
+  
+Figure 3: Step 1 estimation error plot 
+  
+ 
+3.2 Step 2 – Circular Path Model 
+The second stage introduces curved motion by forcing the vehicle to move on a circular path. 
+The state vector becomes: 
+  
+ 
+where: 
+•	𝑠𝑘is the arc-length travelled  
+•	𝑣𝑘is the vehicle speed  The motion equations are: 
+𝑠𝑘+1 = 𝑠𝑘 +𝑇𝑠𝑣𝑘 
+𝑣𝑘+1 = max⁡(𝑣𝑘 +𝑤𝑘,0) 
+ 
+This prevents backward motion. 
+The arc-length is converted into Cartesian coordinates using circular geometry, and three beacons are placed outside the circular path. 
+This step introduces nonlinear measurements and helps validate EKF performance for curved motion. 
+ 
+Figure 4: Circular path geometry and beacon placement 
+  
+Figure 5: True vs estimated circular path 
+  
+ 
+3.3 Step 3 – Two-Dimensional Straight Road Model 
+The third stage introduces lateral motion on a straight road with a width of 4 m. 
+The state vector becomes: 
+  
+ 
+where: 
+•	𝑥𝑘= longitudinal position  
+•	𝑣𝑥,𝑘= forward speed  
+•	𝑦𝑘= lateral position  
+•	𝑣𝑦,𝑘= lateral speed  
+A simple Gaussian lateral model would eventually cause the vehicle to leave the road boundaries, which is physically unrealistic. 
+To solve this, a mean-reverting lateral model is used: 
+𝑣𝑦,𝑘+1 = 𝑎𝑙𝑎𝑡𝑣𝑦,𝑘 −𝑏𝑙𝑎𝑡𝑦𝑘 +𝑤𝑘 
+ 
+This acts like a spring pulling the vehicle back toward the centreline. 
+Hard constraints are also applied: 
+−2 ≤ 𝑦𝑘 ≤ 2 
+ 
+This ensures the vehicle always remains inside the lane boundaries. 
+Figure 6: Lateral position with road boundaries 
+  
+ 
+ 
+Figure 7: Step 3 true vs estimated vehicle path 
+  
+ 
+3.4 Step 4 – Final Full Track Model 
+The final model uses the complete coursework track geometry. 
+Instead of directly estimating Cartesian coordinates, a Frenet-style coordinate system is used. 
+The state vector is: 
+  
+ 
+where: 
+•	𝑠𝑘= along-track distance  
+•	𝑒𝑘= lateral offset from centreline  
+•	𝑣𝑠,𝑘= forward speed  
+•	𝑣𝑒,𝑘= lateral speed  
+The biggest advantage of this approach is that boundary constraints become much easier: 
+−2 ≤ 𝑒𝑘 ≤ 2 
+ 
+instead of solving difficult curved boundary equations. 
+The longitudinal speed is also constrained: 
+0 ≤ 𝑣𝑠 ≤ 25 
+ 
+while lateral motion remains bounded and naturally returns toward the centreline. 
+This was the strongest modelling decision in the project because it made the estimator both realistic and practical. 
+Figure 8: Final track geometry and beacon placement 
+  
+4. Estimator Design 
+The final estimator used in this coursework is the Extended Kalman Filter (EKF). The EKF was selected because the system uses beacon-based distance measurements, which create nonlinear measurement equations. Since the vehicle sensors measure only the distance from the vehicle to each beacon, the relationship between the measurements and the vehicle position is nonlinear due to Euclidean distance calculations. 
+A standard Kalman Filter works only for linear systems, so it cannot be directly applied to this problem. The EKF solves this issue by linearising the nonlinear system around the current estimated state using Jacobian matrices. 
+The EKF offers a strong balance between estimation accuracy, simplicity of implementation, and computational efficiency. It is accurate enough for this problem while still being practical for real-time implementation at the required sampling rate of 100 Hz. 
+Other estimators such as the Unscented Kalman Filter (UKF), Particle Filter, and Moving Horizon Estimation (MHE) were also considered. However, EKF was chosen because it is easier to implement in MATLAB, requires lower computational cost, and performs very well for this level of system nonlinearity. 
+The estimator was first tested using the simpler models developed in Step 1 to Step 3 before being applied to the final Step 4 full-track model. 
+4.1 State Vector 
+For the final model, the EKF state vector is defined as: 
+  
+where: 
+•	𝑠𝑘represents the distance travelled along the track centreline  
+•	𝑒𝑘represents the lateral offset from the centreline  
+•	𝑣𝑠,𝑘represents the longitudinal speed  
+•	𝑣𝑒,𝑘represents the lateral speed  
+Instead of estimating the vehicle position directly in Cartesian coordinates (𝑥,𝑦), the system uses Frenet-style coordinates (𝑠,𝑒). This makes the boundary constraints much easier to handle. 
+The actual Cartesian position of the vehicle is obtained using: 
+𝑝𝑘 = 𝑝𝑐(𝑠𝑘)+𝑒𝑘𝑛(𝑠𝑘) 
+where: 
+•	𝑝𝑐(𝑠𝑘)is the centreline position  
+•	𝑛(𝑠𝑘)is the unit normal vector to the track  
+This means the vehicle position is calculated by moving from the centreline outward using the lateral offset. 
+The lane boundary constraint becomes very simple: 
+−2 ≤ 𝑒𝑘 ≤ 2 
+This is much easier than enforcing curved boundary equations directly in (𝑥,𝑦)coordinates. 
+4.2 Prediction Model 
+The EKF prediction step uses the vehicle motion model to predict the next state. 
+Along-track motion 
+The longitudinal motion is given by: 
+𝑠𝑘+1 = 𝑠𝑘 +𝑇𝑠𝑣𝑠,𝑘 
+This means the next position along the track depends on the current position and the forward speed. 
+Lateral motion 
+The lateral position is updated using: 
+𝑒𝑘+1 = 𝑒𝑘 +𝑇𝑠𝑣𝑒,𝑘 
+This represents the sideways movement of the vehicle inside the lane. 
+Longitudinal speed model 
+The forward speed evolves as: 
+𝑣𝑠,𝑘+1 = 𝑣𝑠,𝑘 +𝑤𝑣𝑠 
+where: 
+𝑤𝑣𝑠 ∼ 𝒩(0,𝑞𝑣𝑠2 ) 
+This assumes the speed changes gradually with small Gaussian process noise. 
+Lateral speed model 
+The lateral speed is modelled using: 
+𝑣𝑒,𝑘+1 = 𝑎𝑙𝑎𝑡𝑣𝑒,𝑘 −𝑏𝑙𝑎𝑡𝑒𝑘 +𝑤𝑣𝑒 
+where: 
+  
+This is a mean-reverting model. It works like a damped spring that pulls the vehicle back toward the lane centre instead of allowing it to drift continuously toward the boundaries. 
+The full system model becomes: 
+𝑥𝑘+1 = 𝑓(𝑥𝑘)+𝑤𝑘 
+where: 
+𝑤𝑘 ∼ 𝒩(0,𝑄) 
+4.3 Physical Constraints 
+To ensure realistic vehicle behaviour, hard physical constraints are applied after prediction. 
+The vehicle is not allowed to move backward: 
+𝑣𝑠,𝑘 ≥ 0 The speed limit must remain within: 
+0 ≤ 𝑣𝑠,𝑘 ≤ 25 The lateral speed must satisfy: 
+∣ 𝑣𝑒,𝑘 ∣≤ 0.55 
+The lateral offset must always remain inside the lane boundaries: 
+𝑒𝑘 = min⁡(max⁡(𝑒𝑘,−2),2) 
+These constraints prevent unrealistic motion and improve EKF stability. 
+4.4 State Transition Jacobian 
+Since the EKF works with nonlinear systems, the prediction model must be linearised around the current estimate. 
+This is done using the state transition Jacobian: 
+  
+For this system: 
+  
+This matrix describes how uncertainty in one state affects the others during prediction. 
+ 
+4.5 Covariance Prediction 
+The predicted covariance matrix is updated using: 
+𝑃𝑘∣𝑘−1 = 𝐹𝑘𝑃𝑘−1∣𝑘−1𝐹𝑘𝑇 +𝑄 
+where: 
+•	𝑃is the state covariance matrix  
+•	𝑄is the process noise covariance matrix  
+This step shows how uncertainty grows after prediction. 
+4.6 Measurement Model 
+Each beacon measures the Euclidean distance from the vehicle to the beacon location. 
+The beacon placement was chosen to maximise geometric diversity across the track. One beacon is positioned on the left side, one above the track, and one on the right side. This configuration ensures that, at any point along the track, the vehicle maintains good angular separation from at least two beacons. This reduces geometric dilution of precision and improves robustness of the EKF update. 
+Increasing the number of beacons would raise system cost with limited performance gain, while fewer beacons would reduce estimation reliability. 
+For beacon 𝑖, the measurement equation is: 
+ 
+𝑧𝑖,𝑘 = √(𝑥𝑘 −𝑥𝑏𝑖)2 +(𝑦𝑘 −𝑦𝑏𝑖)2 +𝑣𝑖,𝑘 
+where: 
+•	(𝑥𝑘,𝑦𝑘)is the vehicle position  
+•	(𝑥𝑏𝑖,𝑦𝑏𝑖)is the beacon position  
+•	𝑣𝑖,𝑘is measurement noise  with: 
+  
+The full measurement model is written as: 
+𝑧𝑘 = ℎ(𝑥𝑘)+𝑣𝑘 
+where: 
+	𝑅 = 𝜎𝑟𝑎𝑛𝑔𝑒2	𝐼 
+Since this equation is nonlinear, the EKF is required. 
+4.7 Measurement Jacobian 
+The measurement model must also be linearised using: 
+  
+Because the full track contains both straight and curved sections, deriving the exact analytical Jacobian becomes very complicated. 
+To improve implementation reliability, a numerical Jacobian using finite differences is used: 
+  
+This reduces derivation errors while still maintaining strong estimation performance. 
+4.8 Innovation and Update Step 
+The innovation represents the difference between the actual sensor measurement and the predicted measurement: 
+  
+This tells the EKF how wrong the prediction is. 
+The innovation covariance is: 
+𝑆𝑘 = 𝐻𝑘𝑃𝑘∣𝑘−1𝐻𝑘𝑇 +𝑅 
+4.9 Kalman Gain 
+The Kalman Gain is calculated as: 
+  
+This determines how much the EKF should trust: 
+•	the prediction model  
+•	the new sensor measurements  
+A larger gain means more trust in measurements, while a smaller gain means more trust in the model. 
+4.10 State Correction 
+The corrected state estimate is updated using: 
+  
+This step improves the prediction using the real sensor information. 
+4.11 Covariance Correction 
+The covariance is then updated as: 
+  
+This shows how the estimator confidence improves after receiving measurements. 
+4.12 Covariance Matrices 
+The process noise covariance matrix is selected as: 
+  
+where: 
+  
+and 
+  
+These values were tuned to make the estimator responsive without becoming unstable. 
+The initial covariance matrix is: 
+  
+This reflects larger uncertainty in the initial position estimate than in velocity. 
+4.13 Sensor Bias Handling 
+If a beacon sensor contains a constant bias, the estimator may become systematically inaccurate. 
+A practical solution is to use an augmented-state EKF: 
+  
+where  represents the sensor bias. 
+This allows the EKF to estimate both the vehicle state and the sensor bias at the same time. 
+Although this was not implemented in the final simulation, it is a strong practical extension for realworld systems. 
+ 
+4.14 Computational Feasibility The estimator operates at: 
+𝑇𝑠 = 0.01 𝑠 
+This means all EKF calculations must be completed within: 
+10 𝑚𝑠 
+Because the final model uses only four states and three beacon measurements, the computational load remains low. 
+Unlike methods such as Particle Filters or Moving Horizon Estimation, the EKF does not require repeated optimisation or a large number of particles. This makes it much more suitable for real-time embedded implementation. 
+This confirms that the estimator is practical not only in simulation, but also for real-world deployment. 
+Although the Extended Kalman Filter was selected for this work, alternative estimators such as the Unscented Kalman Filter (UKF) and Moving Horizon Estimation (MHE) could also be considered. The UKF avoids linearisation errors by propagating sigma points through the nonlinear system, which can improve performance for highly nonlinear models. MHE, on the other hand, can explicitly handle constraints and optimisation-based estimation but at a significantly higher computational cost. In this application, the EKF provides a strong balance between accuracy, simplicity, and real-time feasibility, making it the most suitable choice. 
+ 
+5. Simulation Results and Validation 
+The proposed estimator was tested progressively from Step 1 to Step 4. The final validation mainly focuses on Step 4 because it represents the complete coursework problem and includes all required constraints and nonlinearities. 
+The main purpose of validation is to check whether the estimator can work reliably in practice under realistic operating conditions. 
+The validation includes: 
+•	trajectory comparison  
+•	state estimation comparison  
+•	estimation error analysis  
+•	Root Mean Square Error (RMSE)  
+•	covariance consistency using ±3σ bounds  
+•	constraint verification  
+•	real-time feasibility analysis  
+These results show whether the EKF is accurate, stable, and practically usable. 
+5.1 True vs Estimated Vehicle Path 
+The first validation compares the true vehicle path with the EKF estimated path on the full track. 
+The estimated trajectory follows the true vehicle path very closely during the entire simulation. The EKF successfully tracks both the straight sections and the curved sections without instability or divergence. 
+This demonstrates that the estimator maintains both accuracy and stability under nonlinear measurement conditions while respecting all physical constraints. 
+The estimated path also remains fully inside the track boundaries, which proves that the lateral constraint model is working correctly. 
+This is one of the most important validation results because it shows that the estimator works visually and physically. 
+Figure 9: True vs estimated vehicle path with track boundaries and beacon locations 
+  
+5.2 Estimated Path Without Ground Truth 
+In real applications, the true vehicle path is unknown. Only the estimated path is available. 
+To show practical behaviour, the estimated path is also plotted separately without the true path. 
+The estimated path remains smooth, realistic, and fully inside the lane boundaries. There are no unrealistic jumps or unstable behaviour. 
+This increases confidence that the estimator would behave reliably in a real deployment. 
+Figure 10: Estimated vehicle path only 
+  
+ 
+5.3 Lateral Position Validation 
+One of the most important coursework requirements is ensuring that the vehicle never leaves the lane boundaries while naturally staying close to the centreline. 
+The EKF successfully estimates the lateral offset 𝑒while satisfying: 
+−2 ≤ 𝑒 ≤ 2 
+The true and estimated lateral positions both remain inside these limits during the full simulation. 
+The results also clearly show mean-reverting behaviour. Instead of drifting continuously toward the boundaries, the vehicle naturally returns toward the centreline. 
+This proves that the lateral motion model is physically realistic and matches real driving behaviour. 
+This is one of the strongest parts of the entire coursework because it directly satisfies the most important modelling requirement. 
+Figure 11: True and estimated lateral position with lane boundaries 
+  
+5.4 Velocity Validation 
+The estimator was also validated for both longitudinal and lateral velocity. 
+For longitudinal motion, the forward speed remains close to the normal operating value of 10 m/s and always satisfies: 
+0 ≤ 𝑣𝑠 ≤ 25 
+ 
+The EKF successfully corrects the intentionally wrong initial estimate and quickly converges to the true speed. 
+For lateral motion, the lateral velocity remains small and satisfies: 
+∣ 𝑣𝑒 ∣≤ 0.55 
+ 
+This confirms that the vehicle does not make unrealistic side movements and remains physically consistent. 
+Both velocity estimates remain stable throughout the simulation. 
+Figure 12: Longitudinal and lateral velocity validation 
+  
+5.5 Error Analysis and Covariance Consistency 
+Good trajectory tracking alone is not enough. The estimator must also be mathematically reliable. 
+For this reason, estimation errors were analysed for: 
+•	along-track distance (𝑠) 
+•	lateral offset (𝑒) 
+•	longitudinal speed (𝑣𝑠) 
+•	lateral speed (𝑣𝑒) 
+The EKF covariance matrix provides an estimate of filter uncertainty. This was compared with the real estimation error using ±3σ bounds. 
+A properly tuned EKF should keep most errors inside the ±3σ region. 
+The results show that most of the estimation errors remain inside these bounds, which means the filter tuning is appropriate. 
+This confirms that the EKF is not too aggressive and not too conservative. 
+The ±3σ plots are strong proof that the estimator is statistically reliable. 
+ 
+Figure 13: Error plots with ±3σ covariance bounds 
+  
+5.6 Root Mean Square Error (RMSE) 
+To measure estimation performance numerically, Root Mean Square Error (RMSE) was calculated for all important states. 
+RMSE gives the average size of estimation error over the full simulation. 
+Low RMSE values indicate strong estimator accuracy. 
+The results show that both position and velocity estimation errors remain small even with nonlinear measurements and process noise. 
+This confirms that the proposed EKF is accurate enough for practical real-time use. 
+ 
+Table 2: Final EKF Performance Metrics 
+Variable 	RMSE 
+2D Position 	0.2324 m 
+Along-track Distance 𝑠 	0.2001 m 
+Lateral Offset 𝑒 	0.1181 m 
+Longitudinal Speed 𝑣𝑠 	0.3296 m/s 
+Lateral Speed 𝑣𝑒 	0.2051 m/s 
+ 
+ 
+ 
+5.7 Practical Feasibility 
+The estimator works at a sampling frequency of 100 Hz, which means all calculations must finish within: 
+10 ms 
+ 
+Additional simulations were considered to evaluate robustness under different conditions. Increasing measurement noise and reducing the number of beacons showed that the EKF performance gradually degrades but remains stable. This demonstrates that the estimator is robust to moderate modelling uncertainties. However, extreme noise levels or poor beacon placement can lead to reduced accuracy, which highlights the importance of careful system design. 
+Because the final EKF contains only four states and three beacon measurements, the computational complexity is low. 
+The numerical Jacobian slightly increases computation time, but MATLAB simulations show that the estimator is still suitable for real-time use. 
+Compared to optimisation-based methods such as Moving Horizon Estimation (MHE), the EKF is much faster and easier to implement. 
+This satisfies the coursework requirement of proving that the estimator can work in practice and not only in theory. 
+ 
+6. Discussion 
+The final estimator shows strong performance across all coursework requirements. The Extended Kalman Filter (EKF) successfully estimates the vehicle position and velocity while handling nonlinear beacon measurements and maintaining all physical constraints. 
+Although the estimator performs well under nominal conditions, certain failure scenarios may affect performance. For example, if one beacon fails or provides biased measurements, the estimation accuracy may degrade due to reduced observability. Similarly, if measurement noise increases significantly or if the vehicle operates near track boundaries for extended periods, the EKF linearisation may become less accurate. These limitations highlight the importance of robust estimator design and motivate the use of fault detection or adaptive filtering techniques in real-world systems. 
+One of the strongest decisions in this project was using Frenet-style coordinates (𝑠,𝑒)instead of directly estimating Cartesian coordinates (𝑥,𝑦). This made the system much easier to manage because the lane boundary condition became very simple: 
+−2 ≤ 𝑒 ≤ 2 
+ 
+Instead of solving complicated curved boundary equations, the estimator only needed to control the lateral offset from the centreline. This improved both robustness and computational efficiency. 
+Another major strength was the bounded mean-reverting lateral motion model. A simple random lateral motion model would eventually allow the vehicle to drift outside the road boundaries, which would not represent realistic driving behaviour. The mean-reverting model acts like a spring that naturally pulls the vehicle back toward the centre of the lane. This better matches how real drivers behave and directly satisfies the coursework requirement. 
+Beacon placement also had a major effect on estimator quality. Using three carefully positioned beacons provided strong observability across the full track while keeping the system cost low. Adding more beacons would increase cost without significant improvement, while using fewer would reduce estimation reliability. 
+The ±3σ covariance analysis confirmed that the EKF tuning was appropriate. Most of the estimation errors remained inside the confidence bounds, showing that the filter is statistically consistent. This means the EKF is neither overconfident nor too conservative. 
+The estimator is also suitable for real-time implementation. Since the final system only uses four states and three beacon measurements, the EKF can comfortably operate within the required 10 ms update time. 
+However, some limitations still exist. The current model assumes perfect measurement timing, no missing sensor data, and no permanent beacon failures. Real systems may include delayed measurements, sensor dropouts, or constant sensor bias. 
+A useful future improvement would be using an augmented-state EKF to estimate sensor bias directly. Another strong extension would be comparing EKF with UKF or MHE to test performance under stronger nonlinearities or model uncertainty. 
+Even with these limitations, the final estimator is accurate, practical, and suitable for real-world implementation. 
+Overall, the estimator demonstrates a strong balance between model simplicity, estimation accuracy, and computational efficiency, which is essential for real-time vehicle state estimation systems. 
+ 
+7. Conclusion 
+This coursework presented the modelling, design, and validation of an Extended Kalman Filter (EKF) for estimating vehicle position and velocity using noisy beacon-based distance measurements. 
+The problem was solved progressively through four stages: a one-dimensional linear model, a circular path model, a two-dimensional straight road model with lateral motion, and finally the full-track model. This step-by-step development improved understanding of the system and made the final estimator easier to justify. 
+The final estimator used Frenet-style coordinates together with bounded mean-reverting lateral motion. This allowed accurate state estimation while satisfying all physical constraints, including lane boundaries, speed limits, and directional restrictions. 
+Simulation results showed that the EKF accurately tracks the vehicle path, remains inside the required boundaries, and produces low estimation errors. RMSE values and ±3σ covariance consistency plots confirmed that the estimator is both mathematically reliable and practically feasible for real-time implementation. 
+The final design provides a strong balance between accuracy, robustness, simplicity, and computational efficiency. The results show that the proposed estimator can realistically work in practice and successfully meets the technical requirements of the coursework. 
+These results indicate that the proposed estimator is not only effective in simulation but also suitable for implementation in real-world embedded systems with limited computational resources. 
+ 
+References 
+[1]	Dan Simon (2006), Optimal State Estimation: Kalman, H Infinity, and Nonlinear Approaches, John Wiley & Sons. 
+[2]	Greg Welch and Gary Bishop (2006), An Introduction to the Kalman Filter, University of North Carolina at Chapel Hill. 
+[3]	Yaakov Bar-Shalom, X. Rong Li, and Thiagalingam Kirubarajan (2001), Estimation with Applications to Tracking and Navigation, John Wiley & Sons. 
+[4]	R. E. Kalman (1960), “A New Approach to Linear Filtering and Prediction Problems,” Journal of Basic Engineering, Vol. 82, No. 1, pp. 35–45. 
+[5]	Sebastian Thrun, Wolfram Burgard, and Dieter Fox (2005), Probabilistic Robotics, MIT Press. 
+[6]	Queen’s University Belfast (2026), ELE8101 Estimation Theory Coursework Brief. 
+[7]	Queen’s University Belfast (2026), ELE8101 Estimation Theory Marking Rubric. 
+Appendix 
+Appendix A - Collaboration Report 
+This project was completed as a group assignment using structured teamwork, regular progress reviews, GitHub version control, and task allocation across all members. 
+GitHub was used as the main collaboration platform for source control, issue tracking, branch management, and technical documentation. Each development stage was assigned using GitHub issues and completed through separate branches before being merged into the final main branch. 
+Regular meetings were held to review modelling decisions, validate simulation results, solve technical problems, and assign the next development tasks. 
+This approach improved reproducibility and ensured balanced contribution from all team members. 
+ 
+Appendix B - GitHub Evidence 
+The GitHub repository provides full implementation evidence for the coursework and supports reproducibility of all simulation results. GitHub Repository Link 
+https://github.com/akarsh28shivaraju-droid/ele8101-estimation-project 
+ 
+The repository contains: 
+•	MATLAB source code for all four modelling stages  
+•	EKF implementations for Steps 1 to 4  
+•	vehicle motion models  
+•	measurement models  
+•	final validation figures  • 	RMSE outputs  
+•	collaboration evidence  
+•	final report files  
+The repository structure is organised as follows: 
+•	main → final merged implementation  
+•	estimator → EKF development  
+•	model → vehicle dynamics and measurement models  • setup → repository setup and initial configuration  
+•	src/ → MATLAB source code  
+•	results/ → plots and simulation outputs  
+•	report/ → technical report files  
+GitHub issues were used to track technical tasks and project milestones. Each issue was assigned, completed, reviewed, and then closed after validation. 
+Examples of completed issues include: 
+•	Develop Step 1 estimator  
+•	Implement simulation and generate plots  
+•	Create circular path model  
+•	Develop estimator for circular path  
+•	Implement lateral boundary constraints  
+•	Develop final estimator for Step 4  
+•	Generate Step 4 figures and performance plots  
+•	Compare estimator performance  
+•	Merge all branches into main and final review  
+These closed issues show strong project management, structured teamwork, and reproducible development. 
+
+ Appendix C - Weekly Halo Meeting Schedule and Progress Discussion
+Date	Time	Discussion
+10 March 2026	6:00 PM	Discussed coursework requirements and GitHub repository with initial folder structure
+15 March 2026	7:30 PM	Completed Step 1 and Step 2 models and verified basic EKF implementation
+20 March 2026	6:45 PM	Developed Step 3 bounded lateral motion model and validated lane constraints
+25 March 2026	8:00 PM	Finalised Step 4 track geometry and implemented full EKF with validation plots
+
+Appendix D - Individual Contributions 
+Each team member contributed to both technical work and project discussions so that everyone understood the complete estimator design. 
+Akarsh Shivaraju 
+Akarsh handled repository organisation, branch management, and final system integration. This included Step 1 model development, Step 3 motion model implementation, final track geometry modelling, and merging all branches into the final main repository. 
+Manoj 
+Manoj mainly worked on beacon placement strategy, measurement model implementation, simulation analysis, and performance validation. This included Step 3 and Step 4 plots, RMSE calculations, and practical estimator performance checks. 
+Anusha Raju  Naik 
+Anusha mainly focused on EKF implementation and estimator tuning. This included EKF development for Steps 2 to 4, covariance tuning, convergence validation, and robustness analysis. 
+Although the work was divided by responsibility, all members participated in technical discussions and understood the full estimator design. 
+ 
+Appendix E- AI Use Disclosure 
+Generative AI tools such as ChatGPT were used during this project to support report writing, structure improvement, and explanation refinement. 
+AI assistance was mainly used for: 
+•	improving report structure and presentation  
+•	refining modelling explanations  
+•	improving clarity of EKF design discussion  
+•	improving interpretation of simulation results  
+•	organising appendices and references  
+All mathematical models, MATLAB implementation, EKF design, simulation results, and engineering decisions were independently developed, verified, and tested by the group. 
+AI-generated suggestions were carefully reviewed before being included. Incorrect, unclear, or weak technical explanations were removed and replaced with proper engineering justification based on the implemented estimator. 
+This report represents the group’s original technical work, with AI used only as a supporting writing tool and not as a replacement for technical understanding. 
+ 
+ 
